@@ -57,6 +57,19 @@ postnom, le prénom, le lieu et la date de naissance, ainsi que le lien de
 parenté. Les données ne sont pas conservées comme source de vérité dans
 l’application : l’API et sa base MySQL font foi.
 
+### Profil et photos
+
+L’API d’origine ne proposant pas de profil étudiant, le dossier
+[`api_extension`](api_extension/README.md) fournit les routes et la migration
+SQL nécessaires. Après l’installation de l’extension décrite dans son README,
+le profil se charge depuis `GET /accounts/{id}/profile` et s’enregistre dans
+`account_profile` avec `PUT` (texte) ou `POST` multipart (texte et photo). La
+page **Mon parcours** permet de modifier le nom, le titre, le lieu, les
+coordonnées, le résumé, les informations complémentaires et la photo. Une photo
+facultative peut aussi être choisie lors de l’ajout ou de la modification d’un
+membre de la famille. Les images JPEG, PNG, GIF et WebP sont limitées à 2 Mo.
+Les anciennes tables de comptes et de famille ne sont pas remplacées.
+
 > **Limite d’authentification de l’API fournie :** son README indique qu’aucun
 > endpoint, y compris les routes de gestion familiale, ne requiert de session ou
 > de jeton. L’application vérifie donc le compte auprès de l’API et garde son
@@ -89,9 +102,9 @@ base importée doivent être accessibles.
 ## Contenu
 
 - **CV** : formation, projets, responsabilités, compétences, langues et
-  centres d’intérêt.
+  centres d’intérêt; profil et photo modifiables depuis l’application.
 - **Famille** : liste lue depuis l’API, formulaires d’ajout et de modification,
-  suppression avec confirmation, et rechargement.
+  photos facultatives, suppression avec confirmation, et rechargement.
 - **Contact** : téléphone, e-mail, adresse et GitHub ; un appui sur une
   coordonnée la copie dans le presse-papiers.
 - Les photos sont facultatives dans l’API. Les illustrations génériques sont
@@ -102,4 +115,5 @@ réel n’a été fourni.
 
 ## Dépendances
 
-Flutter et Dart, avec `material_ui`, `cupertino_icons` et `http`.
+Flutter et Dart, avec `material_ui`, `cupertino_icons`, `http` et
+`image_picker`.

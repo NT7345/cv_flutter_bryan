@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/family_member.dart';
+import '../models/user_profile.dart';
 
 String get defaultApiBaseUrl {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
@@ -27,6 +29,18 @@ class ApiAccount {
     }
     return ApiAccount(id: int.parse(id.toString()), email: email);
   }
+}
+
+class AuthenticatedSession {
+  const AuthenticatedSession({
+    required this.apiService,
+    required this.account,
+    required this.profile,
+  });
+
+  final ApiService apiService;
+  final ApiAccount account;
+  final UserProfile profile;
 }
 
 class ApiException implements Exception {
@@ -93,6 +107,26 @@ class ApiService {
     return ApiAccount.fromJson(_dataObject(response));
   }
 
+  Future<UserProfile> getProfile(int accountId, UserProfile initial) async {
+    final response = await _request('GET', 'accounts/$accountId/profile');
+    return UserProfile.fromJson(_dataObject(response), initial: initial);
+  }
+
+  Future<UserProfile> updateProfile(
+    int accountId,
+    UserProfileDraft profile, {
+    XFile? image,
+  }) async {
+    final path = 'accounts/$accountId/profile';
+    final response = image == null
+        ? await _request('PUT', path, body: profile.toJson())
+        : await _requestMultipart('POST', path, profile.toJson(), image);
+    return UserProfile.fromJson(
+      _dataObject(response),
+      initial: profile.asProfile,
+    );
+  }
+
   Future<List<FamilyMember>> listFamilyMembers() async {
     final response = await _request('GET', 'famille-membres');
     final data = response['data'];
@@ -107,24 +141,30 @@ class ApiService {
     }).toList();
   }
 
-  Future<FamilyMember> createFamilyMember(FamilyMemberDraft member) async {
-    final response = await _request(
-      'POST',
-      'famille-membres',
-      body: member.toJson(),
-    );
+  Future<FamilyMember> createFamilyMember(
+    FamilyMemberDraft member, {
+    XFile? image,
+  }) async {
+    final response = image == null
+        ? await _request('POST', 'famille-membres', body: member.toJson())
+        : await _requestMultipart(
+            'POST',
+            'famille-membres',
+            member.toJson(),
+            image,
+          );
     return FamilyMember.fromJson(_dataObject(response));
   }
 
   Future<FamilyMember> updateFamilyMember(
     int id,
-    FamilyMemberDraft member,
-  ) async {
-    final response = await _request(
-      'PUT',
-      'famille-membres/$id',
-      body: member.toJson(),
-    );
+    FamilyMemberDraft member, {
+    XFile? image,
+  }) async {
+    final path = 'famille-membres/$id';
+    final response = image == null
+        ? await _request('PUT', path, body: member.toJson())
+        : await _requestMultipart('POST', path, member.toJson(), image);
     return FamilyMember.fromJson(_dataObject(response));
   }
 
@@ -155,6 +195,37 @@ class ApiService {
       _ => throw ArgumentError.value(method, 'method'),
     };
 
+    return _decodeResponse(response);
+  }
+
+  Future<Map<String, dynamic>> _requestMultipart(
+    String method,
+    String path,
+    Map<String, String> fields,
+    XFile image,
+  ) async {
+    final bytes = await image.readAsBytes();
+    if (bytes.length > 2 * 1024 * 1024) {
+      throw const FormatException('La photo doit faire 2 Mo maximum.');
+    }
+
+    final request = http.MultipartRequest(method, Uri.parse('$baseUrl/$path'))
+      ..fields.addAll(fields)
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          bytes,
+          filename: image.name.isEmpty ? 'photo.jpg' : image.name,
+        ),
+      );
+    final streamedResponse = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamedResponse);
+    return _decodeResponse(response);
+  }
+
+  Map<String, dynamic> _decodeResponse(http.Response response) {
     final decoded = jsonDecode(response.body);
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('Réponse JSON de l’API invalide.');

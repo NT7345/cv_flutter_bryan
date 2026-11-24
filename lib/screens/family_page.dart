@@ -1,12 +1,21 @@
 import 'dart:async';
 
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../app_colors.dart';
 import '../models/family_member.dart';
 import '../services/api_service.dart';
 import '../widgets/cv_widgets.dart';
+import '../widgets/photo_picker_field.dart';
+
+class FamilyMemberFormResult {
+  const FamilyMemberFormResult({required this.member, this.image});
+
+  final FamilyMemberDraft member;
+  final XFile? image;
+}
 
 class FamilyPage extends StatefulWidget {
   const FamilyPage({required this.apiService, super.key});
@@ -62,12 +71,15 @@ class _FamilyPageState extends State<FamilyPage> {
   }
 
   Future<void> _addMember() async {
-    final draft = await _showMemberForm();
-    if (draft == null || !mounted) return;
+    final result = await _showMemberForm();
+    if (result == null || !mounted) return;
 
     setState(() => _isSaving = true);
     try {
-      final member = await widget.apiService.createFamilyMember(draft);
+      final member = await widget.apiService.createFamilyMember(
+        result.member,
+        image: result.image,
+      );
       if (!mounted) return;
       setState(() {
         _members = [..._members, member];
@@ -86,14 +98,15 @@ class _FamilyPageState extends State<FamilyPage> {
   }
 
   Future<void> _editMember(FamilyMember member) async {
-    final draft = await _showMemberForm(member: member);
-    if (draft == null || !mounted) return;
+    final result = await _showMemberForm(member: member);
+    if (result == null || !mounted) return;
 
     setState(() => _isSaving = true);
     try {
       final updated = await widget.apiService.updateFamilyMember(
         member.id,
-        draft,
+        result.member,
+        image: result.image,
       );
       if (!mounted) return;
       setState(() {
@@ -155,8 +168,8 @@ class _FamilyPageState extends State<FamilyPage> {
     }
   }
 
-  Future<FamilyMemberDraft?> _showMemberForm({FamilyMember? member}) {
-    return showDialog<FamilyMemberDraft>(
+  Future<FamilyMemberFormResult?> _showMemberForm({FamilyMember? member}) {
+    return showDialog<FamilyMemberFormResult>(
       context: context,
       builder: (context) => FamilyMemberFormDialog(member: member),
     );
@@ -443,6 +456,7 @@ class _FamilyMemberFormDialogState extends State<FamilyMemberFormDialog> {
   late final Map<String, TextEditingController> _controllers;
 
   bool get _isEditing => widget.member != null;
+  XFile? _image;
 
   @override
   void initState() {
@@ -501,13 +515,16 @@ class _FamilyMemberFormDialogState extends State<FamilyMemberFormDialog> {
     if (!_formKey.currentState!.validate()) return;
     Navigator.pop(
       context,
-      FamilyMemberDraft(
-        nom: _controllers['nom']!.text.trim(),
-        postnom: _controllers['postnom']!.text.trim(),
-        prenom: _controllers['prenom']!.text.trim(),
-        lieuNaissance: _controllers['lieu_naissance']!.text.trim(),
-        dateNaissance: _controllers['date_naissance']!.text.trim(),
-        parente: _controllers['parente']!.text.trim(),
+      FamilyMemberFormResult(
+        member: FamilyMemberDraft(
+          nom: _controllers['nom']!.text.trim(),
+          postnom: _controllers['postnom']!.text.trim(),
+          prenom: _controllers['prenom']!.text.trim(),
+          lieuNaissance: _controllers['lieu_naissance']!.text.trim(),
+          dateNaissance: _controllers['date_naissance']!.text.trim(),
+          parente: _controllers['parente']!.text.trim(),
+        ),
+        image: _image,
       ),
     );
   }
@@ -534,6 +551,11 @@ class _FamilyMemberFormDialogState extends State<FamilyMemberFormDialog> {
                   ),
                 ),
                 const SizedBox(height: 18),
+                PhotoPickerField(
+                  initialImageUrl: widget.member?.imageUrl,
+                  onChanged: (image) => _image = image,
+                ),
+                const SizedBox(height: 16),
                 _textField('Prénom', 'prenom', 50),
                 const SizedBox(height: 12),
                 _textField('Nom', 'nom', 50),

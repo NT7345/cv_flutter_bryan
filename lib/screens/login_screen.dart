@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 
 import '../app_colors.dart';
+import '../data/cv_data.dart';
 import '../services/api_service.dart';
 import '../widgets/cv_widgets.dart';
 
@@ -15,7 +16,7 @@ class LoginScreen extends StatefulWidget {
     super.key,
   });
 
-  final ValueChanged<ApiService> onAuthenticated;
+  final ValueChanged<AuthenticatedSession> onAuthenticated;
   final ApiService Function(String baseUrl) apiServiceFactory;
   final String initialApiBaseUrl;
 
@@ -68,9 +69,22 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      await service.login(_emailController.text, _passwordController.text);
+      final account = await service.login(
+        _emailController.text,
+        _passwordController.text,
+      );
+      final profile = await service.getProfile(
+        account.id,
+        CvData.initialProfile,
+      );
       if (!mounted) return;
-      widget.onAuthenticated(service);
+      widget.onAuthenticated(
+        AuthenticatedSession(
+          apiService: service,
+          account: account,
+          profile: profile,
+        ),
+      );
     } on ApiException catch (error) {
       _showError(error.message);
     } on http.ClientException {

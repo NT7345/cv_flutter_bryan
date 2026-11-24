@@ -1,21 +1,26 @@
-import 'package:material_ui/material_ui.dart';
+import 'dart:async';
+
+import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../app_colors.dart';
 import '../data/cv_data.dart';
+import '../models/user_profile.dart';
 import '../services/api_service.dart';
 import '../widgets/cv_widgets.dart';
 import 'family_page.dart';
+import 'profile_form_dialog.dart';
 
 class PortfolioScreen extends StatefulWidget {
   const PortfolioScreen({
     required this.onSignOut,
-    required this.apiService,
+    required this.session,
     super.key,
   });
 
   final VoidCallback onSignOut;
-  final ApiService apiService;
+  final AuthenticatedSession session;
 
   @override
   State<PortfolioScreen> createState() => _PortfolioScreenState();
@@ -23,11 +28,55 @@ class PortfolioScreen extends StatefulWidget {
 
 class _PortfolioScreenState extends State<PortfolioScreen> {
   int _selectedIndex = 0;
+  late UserProfile _profile = widget.session.profile;
+  bool _isSavingProfile = false;
 
   static const _titles = ['Mon parcours', 'Ma famille', 'Me contacter'];
 
   void _signOut() {
     widget.onSignOut();
+  }
+
+  Future<void> _editProfile() async {
+    final result = await showDialog<ProfileFormResult>(
+      context: context,
+      builder: (context) => ProfileFormDialog(profile: _profile),
+    );
+    if (result == null || !mounted) return;
+
+    setState(() => _isSavingProfile = true);
+    try {
+      final updated = await widget.session.apiService.updateProfile(
+        widget.session.account.id,
+        result.profile,
+        image: result.image,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _isSavingProfile = false;
+      });
+      _showMessage('Profil mis à jour.');
+    } on ApiException catch (error) {
+      _finishProfileUpdate(error.message);
+    } on http.ClientException {
+      _finishProfileUpdate('Impossible de joindre l’API. Vérifiez le serveur.');
+    } on TimeoutException {
+      _finishProfileUpdate('Le serveur ne répond pas. Réessayez.');
+    } on FormatException catch (error) {
+      _finishProfileUpdate(error.message);
+    }
+  }
+
+  void _finishProfileUpdate(String message) {
+    if (!mounted) return;
+    setState(() => _isSavingProfile = false);
+    _showMessage(message);
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -42,8 +91,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
               _titles[_selectedIndex],
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
-            const Text(
-              'BRYAN NTAMBWE  ·  GOMA',
+            Text(
+              '${_profile.nom.toUpperCase()}  ·  ${_profile.lieu.toUpperCase()}',
               style: TextStyle(
                 color: AppColors.muted,
                 fontSize: 9,
@@ -65,9 +114,13 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const ProfilePage(),
-          FamilyPage(apiService: widget.apiService),
-          const ContactPage(),
+          ProfilePage(
+            profile: _profile,
+            onEdit: _isSavingProfile ? null : _editProfile,
+            isSaving: _isSavingProfile,
+          ),
+          FamilyPage(apiService: widget.session.apiService),
+          ContactPage(profile: _profile),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -100,7 +153,16 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 }
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({
+    required this.profile,
+    required this.onEdit,
+    required this.isSaving,
+    super.key,
+  });
+
+  final UserProfile profile;
+  final VoidCallback? onEdit;
+  final bool isSaving;
 
   @override
   Widget build(BuildContext context) {
@@ -109,9 +171,46 @@ class ProfilePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _ProfileHero(),
+            _ProfileHero(profile: profile, onEdit: onEdit, isSaving: isSaving),
             const SizedBox(height: 22),
-            const _SummaryCard(),
+            _SummaryCard(profile: profile),
+            if (profile.informations.trim().isNotEmpty) ...[
+              const SizedBox(height: 14),
+              SoftCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          color: AppColors.green,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Informations complémentaires',
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      profile.informations,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                        height: 1.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 32),
             const SectionHeading(
               kicker: 'Parcours',
@@ -227,7 +326,15 @@ class ProfilePage extends StatelessWidget {
 }
 
 class _ProfileHero extends StatelessWidget {
-  const _ProfileHero();
+  const _ProfileHero({
+    required this.profile,
+    required this.onEdit,
+    required this.isSaving,
+  });
+
+  final UserProfile profile;
+  final VoidCallback? onEdit;
+  final bool isSaving;
 
   @override
   Widget build(BuildContext context) {
@@ -246,44 +353,55 @@ class _ProfileHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              const ProfileIllustration(size: 76),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .15),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      color: Colors.white,
-                      size: 14,
+              _ProfilePhoto(imageUrl: profile.imageUrl),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 7,
                     ),
-                    SizedBox(width: 4),
-                    Text(
-                      'GOMA, RDC',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: .5,
-                      ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .15),
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.location_on_outlined,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            profile.lieu.isEmpty
+                                ? 'Lieu non renseigné'
+                                : profile.lieu,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: .5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          const Text(
-            'ÉTUDIANT  ·  ENTREPRENEUR',
-            style: TextStyle(
+          Text(
+            profile.titre.toUpperCase(),
+            style: const TextStyle(
               color: Color(0xFFC9E1D2),
               fontSize: 10,
               fontWeight: FontWeight.w800,
@@ -291,9 +409,9 @@ class _ProfileHero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            CvData.name,
-            style: TextStyle(
+          Text(
+            profile.nom,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 23,
               height: 1.16,
@@ -302,12 +420,32 @@ class _ProfileHero extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            CvData.title,
-            style: TextStyle(
+          Text(
+            profile.titre,
+            style: const TextStyle(
               color: Color(0xFFE2EEE7),
               fontSize: 13,
               height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            key: const ValueKey('edit-profile'),
+            onPressed: onEdit,
+            icon: isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.edit_outlined, size: 18),
+            label: Text(isSaving ? 'Enregistrement…' : 'Modifier mon profil'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: BorderSide(color: Colors.white.withValues(alpha: .65)),
             ),
           ),
         ],
@@ -316,8 +454,34 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
+class _ProfilePhoto extends StatelessWidget {
+  const _ProfilePhoto({required this.imageUrl});
+
+  final String? imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl;
+    if (url == null || url.isEmpty) {
+      return const ProfileIllustration(size: 76);
+    }
+    return ClipOval(
+      child: Image.network(
+        url,
+        width: 76,
+        height: 76,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) =>
+            const ProfileIllustration(size: 76),
+      ),
+    );
+  }
+}
+
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard();
+  const _SummaryCard({required this.profile});
+
+  final UserProfile profile;
 
   @override
   Widget build(BuildContext context) {
@@ -346,8 +510,8 @@ class _SummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 11),
-          const Text(
-            CvData.summary,
+          Text(
+            profile.resume,
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 13,
@@ -537,7 +701,9 @@ class _ProjectCard extends StatelessWidget {
 }
 
 class ContactPage extends StatelessWidget {
-  const ContactPage({super.key});
+  const ContactPage({required this.profile, super.key});
+
+  final UserProfile profile;
 
   Future<void> _copy(BuildContext context, String label, String value) async {
     await Clipboard.setData(ClipboardData(text: value));
@@ -572,22 +738,24 @@ class ContactPage extends StatelessWidget {
             _ContactCard(
               icon: Icons.phone_outlined,
               label: 'TÉLÉPHONE',
-              value: CvData.phone,
-              onTap: () => _copy(context, 'Numéro', CvData.phone),
+              value: profile.telephone.isEmpty
+                  ? 'Non renseigné'
+                  : profile.telephone,
+              onTap: () => _copy(context, 'Numéro', profile.telephone),
             ),
             const SizedBox(height: 12),
             _ContactCard(
               icon: Icons.mail_outline_rounded,
               label: 'E-MAIL',
-              value: CvData.email,
-              onTap: () => _copy(context, 'Adresse e-mail', CvData.email),
+              value: profile.email.isEmpty ? 'Non renseigné' : profile.email,
+              onTap: () => _copy(context, 'Adresse e-mail', profile.email),
             ),
             const SizedBox(height: 12),
             _ContactCard(
               icon: Icons.location_on_outlined,
               label: 'ADRESSE',
-              value: CvData.city,
-              onTap: () => _copy(context, 'Adresse', CvData.city),
+              value: profile.lieu.isEmpty ? 'Non renseigné' : profile.lieu,
+              onTap: () => _copy(context, 'Adresse', profile.lieu),
             ),
             const SizedBox(height: 12),
             _ContactCard(

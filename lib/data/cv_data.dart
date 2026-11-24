@@ -1,3 +1,5 @@
+import '../models/user_profile.dart';
+
 class EducationItem {
   const EducationItem({
     required this.period,
@@ -35,6 +37,20 @@ abstract final class CvData {
   static const phone = '+243 971 023 985';
   static const email = 'bryanntambwe07@gmail.com';
   static const github = 'https://github.com/NT7345';
+
+  static const initialProfile = UserProfile(
+    nom: name,
+    titre: title,
+    lieu: city,
+    telephone: phone,
+    email: email,
+    resume:
+        'Étudiant en dernière année de Licence à l’ISIG-Goma, passionné par '
+        'les technologies de l’information, le développement d’applications et '
+        'les solutions numériques au service des entreprises. Entrepreneur et '
+        'responsable associatif, j’aime transformer les idées en projets concrets.',
+    informations: '',
+  );
 
   static const summary =
       'Étudiant en dernière année de Licence à l’ISIG-Goma, passionné par '

@@ -96,22 +96,22 @@ class _AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<_AuthGate> {
-  ApiService? _apiService;
+  AuthenticatedSession? _session;
 
   @override
   Widget build(BuildContext context) {
-    final apiService = _apiService;
-    if (apiService != null) {
+    final session = _session;
+    if (session != null) {
       return PortfolioScreen(
-        apiService: apiService,
-        onSignOut: () => setState(() => _apiService = null),
+        session: session,
+        onSignOut: () => setState(() => _session = null),
       );
     }
 
     return LoginScreen(
       apiServiceFactory: widget.apiServiceFactory,
       initialApiBaseUrl: widget.initialApiBaseUrl,
-      onAuthenticated: (service) => setState(() => _apiService = service),
+      onAuthenticated: (session) => setState(() => _session = session),
     );
   }
 }

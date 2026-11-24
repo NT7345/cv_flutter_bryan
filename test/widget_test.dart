@@ -15,6 +15,15 @@ void main() {
     final requests = <http.Request>[];
     final client = MockClient((request) async {
       requests.add(request);
+      if (request.url.path.endsWith('/profile')) {
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {'is_initialized': false, 'image_url': null},
+        });
+      }
+      if (request.method == 'GET') {
+        return _jsonResponse(200, {'success': true, 'data': <Object>[]});
+      }
       final body = jsonDecode(request.body) as Map<String, dynamic>;
       if (body['email'] != 'bryan@example.com' ||
           body['password'] != 'password123') {
@@ -62,7 +71,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Mon parcours'), findsOneWidget);
-    expect(requests, hasLength(3));
+    expect(requests, hasLength(4));
     expect(
       requests.take(2).every((request) => request.method == 'POST'),
       isTrue,
@@ -73,6 +82,7 @@ void main() {
           .every((request) => request.url.path == '/public/accounts/login'),
       isTrue,
     );
+    expect(requests[2].url.path, '/public/accounts/7/profile');
     expect(requests.last.url.path, '/public/famille-membres');
   });
 
@@ -83,6 +93,15 @@ void main() {
     final paths = <String>[];
     final client = MockClient((request) async {
       paths.add(request.url.path);
+      if (request.url.path.endsWith('/profile')) {
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {'is_initialized': false, 'image_url': null},
+        });
+      }
+      if (request.method == 'GET') {
+        return _jsonResponse(200, {'success': true, 'data': <Object>[]});
+      }
       final data = request.method == 'POST'
           ? {'id': 8, 'email': 'new@example.com'}
           : <String, Object>{};
@@ -117,6 +136,7 @@ void main() {
     expect(paths, [
       '/public/accounts/register',
       '/public/accounts/login',
+      '/public/accounts/8/profile',
       '/public/famille-membres',
     ]);
   });
@@ -133,6 +153,12 @@ void main() {
         return _jsonResponse(200, {
           'success': true,
           'data': {'id': 7, 'email': 'bryan@example.com'},
+        });
+      }
+      if (request.url.path.endsWith('/profile')) {
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {'is_initialized': false, 'image_url': null},
         });
       }
       if (request.method == 'GET') {
@@ -201,6 +227,8 @@ void main() {
       find.byKey(const ValueKey('member-parente')),
       'Frère',
     );
+    await tester.ensureVisible(find.text('Ajouter'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Ajouter'));
     await tester.pumpAndSettle();
     expect(find.text('Jean Kabila Mwamba'), findsOneWidget);
@@ -216,6 +244,8 @@ void main() {
       find.byKey(const ValueKey('member-lieu_naissance')),
       'Bukavu',
     );
+    await tester.ensureVisible(find.text('Enregistrer').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Enregistrer'));
     await tester.pumpAndSettle();
     expect(find.text('Bukavu · 1990-05-12'), findsOneWidget);
@@ -238,6 +268,83 @@ void main() {
     expect(calls, contains('POST /public/famille-membres'));
     expect(calls, contains('PUT /public/famille-membres/1'));
     expect(calls, contains('DELETE /public/famille-membres/1'));
+  });
+
+  testWidgets('profile edits are saved through the API and shown in the CV', (
+    tester,
+  ) async {
+    _usePhoneViewport(tester);
+    final calls = <String>[];
+    final client = MockClient((request) async {
+      calls.add('${request.method} ${request.url.path}');
+      if (request.url.path.endsWith('/accounts/login')) {
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {'id': 12, 'email': 'bryan@example.com'},
+        });
+      }
+      if (request.url.path.endsWith('/profile') && request.method == 'GET') {
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {'is_initialized': false, 'image_url': null},
+        });
+      }
+      if (request.url.path.endsWith('/profile')) {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        return _jsonResponse(200, {
+          'success': true,
+          'data': {...body, 'is_initialized': true, 'image_url': null},
+        });
+      }
+      return _jsonResponse(200, {'success': true, 'data': <Object>[]});
+    });
+
+    await tester.pumpWidget(
+      CvFlutterApp(
+        initialApiBaseUrl: 'http://api.test/public',
+        apiServiceFactory: (url) => ApiService(baseUrl: url, client: client),
+      ),
+    );
+    await _signIn(tester);
+    await tester.tap(find.byKey(const ValueKey('edit-profile')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-nom')),
+      'Bryan Profil Test',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-titre')),
+      'Développeur mobile',
+    );
+    await tester.enterText(find.byKey(const ValueKey('profile-lieu')), 'Goma');
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-telephone')),
+      '+243900000000',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-email')),
+      'profil@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-resume')),
+      'Résumé modifié pour mon profil.',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('profile-informations')),
+      'Informations supplémentaires.',
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('save-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save-profile')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bryan Profil Test'), findsOneWidget);
+    expect(find.text('Résumé modifié pour mon profil.'), findsOneWidget);
+    await tester.tap(find.text('Contact'));
+    await tester.pumpAndSettle();
+    expect(find.text('+243900000000'), findsOneWidget);
+    expect(find.text('profil@example.com'), findsOneWidget);
+    expect(calls, contains('PUT /public/accounts/12/profile'));
   });
 
   testWidgets('password remains masked on the login screen', (tester) async {
