@@ -1,15 +1,27 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'app_colors.dart';
+import 'services/api_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/portfolio_screen.dart';
 
 void main() {
-  runApp(const CvFlutterApp());
+  runApp(CvFlutterApp());
 }
 
 class CvFlutterApp extends StatelessWidget {
-  const CvFlutterApp({super.key});
+  CvFlutterApp({
+    ApiService Function(String baseUrl)? apiServiceFactory,
+    String? initialApiBaseUrl,
+    super.key,
+  }) : apiServiceFactory = apiServiceFactory ?? _createApiService,
+       initialApiBaseUrl = initialApiBaseUrl ?? defaultApiBaseUrl;
+
+  final ApiService Function(String baseUrl) apiServiceFactory;
+  final String initialApiBaseUrl;
+
+  static ApiService _createApiService(String baseUrl) =>
+      ApiService(baseUrl: baseUrl);
 
   @override
   Widget build(BuildContext context) {
@@ -62,31 +74,44 @@ class CvFlutterApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const _AuthGate(),
+      home: _AuthGate(
+        apiServiceFactory: apiServiceFactory,
+        initialApiBaseUrl: initialApiBaseUrl,
+      ),
     );
   }
 }
 
 class _AuthGate extends StatefulWidget {
-  const _AuthGate();
+  const _AuthGate({
+    required this.apiServiceFactory,
+    required this.initialApiBaseUrl,
+  });
+
+  final ApiService Function(String baseUrl) apiServiceFactory;
+  final String initialApiBaseUrl;
 
   @override
   State<_AuthGate> createState() => _AuthGateState();
 }
 
 class _AuthGateState extends State<_AuthGate> {
-  bool _isAuthenticated = false;
+  ApiService? _apiService;
 
   @override
   Widget build(BuildContext context) {
-    if (_isAuthenticated) {
+    final apiService = _apiService;
+    if (apiService != null) {
       return PortfolioScreen(
-        onSignOut: () => setState(() => _isAuthenticated = false),
+        apiService: apiService,
+        onSignOut: () => setState(() => _apiService = null),
       );
     }
 
     return LoginScreen(
-      onAuthenticated: () => setState(() => _isAuthenticated = true),
+      apiServiceFactory: widget.apiServiceFactory,
+      initialApiBaseUrl: widget.initialApiBaseUrl,
+      onAuthenticated: (service) => setState(() => _apiService = service),
     );
   }
 }

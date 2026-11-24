@@ -26,20 +26,6 @@ class ProjectItem {
   final String icon;
 }
 
-class FamilyMember {
-  const FamilyMember({
-    required this.name,
-    required this.relationship,
-    required this.initials,
-    required this.colorIndex,
-  });
-
-  final String name;
-  final String relationship;
-  final String initials;
-  final int colorIndex;
-}
-
 abstract final class CvData {
   static const name = 'NTAMBWE MATANDA BRYAN';
   static const shortName = 'Bryan Ntambwe';
@@ -136,32 +122,5 @@ abstract final class CvData {
     'Analyse de données',
     'Musique',
     'Direction chorale',
-  ];
-
-  static const family = [
-    FamilyMember(
-      name: 'Suzanne Waridi',
-      relationship: 'Mère',
-      initials: 'SW',
-      colorIndex: 0,
-    ),
-    FamilyMember(
-      name: 'Bella Ntambwe',
-      relationship: 'Sœur',
-      initials: 'BN',
-      colorIndex: 1,
-    ),
-    FamilyMember(
-      name: 'Raphael Nfune',
-      relationship: 'Frère',
-      initials: 'RN',
-      colorIndex: 2,
-    ),
-    FamilyMember(
-      name: 'Jeff Muvikwa',
-      relationship: 'Frère',
-      initials: 'JM',
-      colorIndex: 3,
-    ),
   ];
 }

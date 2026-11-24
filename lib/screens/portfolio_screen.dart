@@ -3,12 +3,19 @@ import 'package:flutter/services.dart';
 
 import '../app_colors.dart';
 import '../data/cv_data.dart';
+import '../services/api_service.dart';
 import '../widgets/cv_widgets.dart';
+import 'family_page.dart';
 
 class PortfolioScreen extends StatefulWidget {
-  const PortfolioScreen({required this.onSignOut, super.key});
+  const PortfolioScreen({
+    required this.onSignOut,
+    required this.apiService,
+    super.key,
+  });
 
   final VoidCallback onSignOut;
+  final ApiService apiService;
 
   @override
   State<PortfolioScreen> createState() => _PortfolioScreenState();
@@ -16,8 +23,6 @@ class PortfolioScreen extends StatefulWidget {
 
 class _PortfolioScreenState extends State<PortfolioScreen> {
   int _selectedIndex = 0;
-
-  static const _pages = [ProfilePage(), FamilyPage(), ContactPage()];
 
   static const _titles = ['Mon parcours', 'Ma famille', 'Me contacter'];
 
@@ -57,7 +62,14 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: IndexedStack(index: _selectedIndex, children: _pages),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          const ProfilePage(),
+          FamilyPage(apiService: widget.apiService),
+          const ContactPage(),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         backgroundColor: Colors.white,
@@ -519,117 +531,6 @@ class _ProjectCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class FamilyPage extends StatelessWidget {
-  const FamilyPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: PageContent(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SectionHeading(
-              kicker: 'Mes proches',
-              title: 'Une famille, un repère.',
-            ),
-            const SizedBox(height: 9),
-            const Text(
-              'Les personnes qui comptent et m’accompagnent au quotidien.',
-              style: TextStyle(
-                color: AppColors.muted,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ...CvData.family.map(
-              (member) => Padding(
-                padding: const EdgeInsets.only(bottom: 13),
-                child: SoftCard(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      ProfileIllustration(
-                        size: 64,
-                        colorIndex: member.colorIndex,
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              member.name,
-                              style: const TextStyle(
-                                color: AppColors.ink,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFECEFE7),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                member.relationship,
-                                style: const TextStyle(
-                                  color: AppColors.greenDark,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.favorite_rounded,
-                        color: Color(0xFFE89B58),
-                        size: 19,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            SoftCard(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.photo_camera_back_outlined,
-                    color: AppColors.green,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Illustrations de remplacement : ajoutez les photos '
-                      'de votre famille avec son accord avant de les publier.',
-                      style: TextStyle(
-                        color: AppColors.muted,
-                        fontSize: 12,
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
