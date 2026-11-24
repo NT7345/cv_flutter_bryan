@@ -2,7 +2,11 @@
 
 Application Flutter multiplateforme qui présente mon parcours, ma famille et
 mes coordonnées. La famille et les comptes sont gérés par l’API REST fournie
-pour le TP2. Aucune vidéo de démonstration n’est incluse.
+pour le TP2.
+
+## Démonstration vidéo
+
+[Télécharger ou visionner la vidéo de démonstration](videos/demo.mp4).
 
 ## Captures d’écran du TP1
 
